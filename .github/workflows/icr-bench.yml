@@ -1,0 +1,91 @@
+# ICR benchmark: laravel/framework's own Linux test job, one matrix cell (PHP 8.4, PHPUnit 12.5.8, prefer-stable), with
+# its MySQL, Redis, Memcached and DynamoDB service containers, on GitHub-hosted and ICR runners from one pinned upstream
+# commit (.icr-upstream). Only Irvyne starts a run: a manual dispatch by a writer, then the icr-bench environment's
+# approval. No pull request, fork or comment can execute anything here. Timings are read from GitHub's API.
+name: ICR bench · laravel
+
+on:
+  workflow_dispatch:
+    inputs:
+      legs:
+        description: JSON list of runner labels to measure (one at a time gives the cleanest numbers)
+        default: '["ubuntu-latest", "icr-2c", "icr-4c", "icr-8c"]'
+        type: string
+      note:
+        description: free text echoed in the run (campaign, cache state)
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: ${{ matrix.leg }}
+    runs-on: ${{ matrix.leg }}
+    environment: icr-bench
+    timeout-minutes: 90
+
+    # upstream tests.yml, job linux_tests, verbatim
+    services:
+      memcached:
+        image: memcached:1.6-alpine
+        ports:
+          - 11211:11211
+      mysql:
+        image: mysql:9.7
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: forge
+        ports:
+          - 3306
+        options: --health-cmd="mysqladmin ping" --health-start-period=30s --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: redis:7.0
+        ports:
+          - 6379:6379
+        options: --entrypoint redis-server
+      dynamodb:
+        image: amazon/dynamodb-local:2.0.0
+        ports:
+          - 8888:8000
+
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: ${{ fromJSON(inputs.legs) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Runner facts
+        env:
+          LEG: ${{ matrix.leg }}
+          NOTE: ${{ inputs.note }}
+        run: echo "leg=$LEG note=$NOTE runner=$RUNNER_NAME cpus=$(nproc) mem=$(free -g | awk '/Mem/ {print $2}')G kernel=$(uname -r) os=$(. /etc/os-release && echo "$PRETTY_NAME") docker=$(docker --version) upstream=$(sed -n 's/^commit //p' .icr-upstream)"
+
+      # upstream's step with matrix.php = 8.4, matrix.phpunit = 12.5.8, matrix.stability = prefer-stable
+      - name: Setup PHP project
+        uses: ./.github/actions/setup-php-project
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, gd, redis, igbinary, msgpack, memcached, gmp, :php-psr
+          ini-values: error_reporting=E_ALL
+          redis-configure-opts: --enable-redis --enable-redis-igbinary --enable-redis-msgpack --enable-redis-lzf --with-liblzf --enable-redis-zstd --with-libzstd --enable-redis-lz4 --with-liblz4
+          redis-libs: liblz4-dev, liblzf-dev, libzstd-dev
+          composer-command: composer update --prefer-stable --prefer-dist --no-interaction --no-progress --with="phpunit/phpunit:~12.5.8"
+
+      # upstream's command minus --fail-on-deprecation: a deprecation in a dependency released after the pinned commit
+      # would abort the measurement; deprecations are still displayed
+      - name: Execute tests
+        run: vendor/bin/phpunit --display-deprecation --no-coverage
+        env:
+          DB_PORT: ${{ job.services.mysql.ports[3306] }}
+          DB_USERNAME: root
+          DYNAMODB_CACHE_TABLE: laravel_dynamodb_test
+          DYNAMODB_ENDPOINT: "http://localhost:8888"
+          AWS_ACCESS_KEY_ID: randomKey
+          AWS_SECRET_ACCESS_KEY: randomSecret

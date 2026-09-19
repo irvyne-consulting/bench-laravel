@@ -1,0 +1,5 @@
+repo https://github.com/laravel/framework
+branch 13.x
+commit 1d9727160ad440d1ccf2fdcbb7e4f4f36efae212
+tree aff561e24367e7572ee031105936f8dae6a6bcc8
+taken 2026-09-19
