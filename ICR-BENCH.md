@@ -13,8 +13,9 @@ under `.github/upstream-workflows/` and do not run here. Nothing else was change
 extensions are installed by `shivammathur/setup-php` (the Redis extension is compiled), dependencies come from Composer
 without a cache, then PHPUnit runs the suite. Two edits: `--fail-on-deprecation` is dropped, so a deprecation in a
 dependency released after the pinned commit cannot abort a measurement; and the `imagick` extension is disabled
-(`:imagick`), because GitHub-hosted runners have none for PHP 8.4 while a self-hosted install brings it, and its AVIF
-test then needs an encoder Ubuntu 26.04's ImageMagick lacks — both legs now run the same tests with the same skips.
+(`:imagick`) on every leg, because with it loaded the AVIF test errors on Ubuntu 26.04 (its ImageMagick has no AVIF
+encoder) while it passes or skips on GitHub's 24.04 — both sides now skip the same 32 imagick-guarded tests (570
+skipped instead of 539) and run the other 15 100.
 Note the operating systems differ: `ubuntu-latest` was Ubuntu 24.04 (kernel 6.17, Docker 28) at the time of the runs,
 ICR runs Ubuntu 26.04 (kernel 7.0, Docker 29); both are printed by the "Runner facts" step. It runs on `ubuntu-latest` (GitHub-hosted: on a
 public repository a 4 vCPU / 16 GB runner; a private repository gets 2 vCPU / 7 GB) and on ICR's `icr-2c`, `icr-4c` and

@@ -72,9 +72,9 @@ jobs:
         uses: ./.github/actions/setup-php-project
         with:
           php-version: '8.4'
-          # :imagick added to upstream's list — GitHub-hosted runners have no imagick for PHP 8.4 (setup-php's cached
-          # build), a self-hosted install from the PPA brings it, and its AVIF test then needs an encoder that Ubuntu
-          # 26.04's ImageMagick lacks; disabled, both legs run the same 15 693 tests with the same 539 skips
+          # :imagick added to upstream's list: with imagick loaded, the AVIF test errors on Ubuntu 26.04 (ImageMagick
+          # there has no AVIF encoder) while it passes or skips on GitHub's 24.04. Disabling the extension on every leg
+          # makes both sides skip the same 32 imagick-guarded tests (570 skipped instead of 539) and run the rest.
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, gd, redis, igbinary, msgpack, memcached, gmp, :php-psr, :imagick
           ini-values: error_reporting=E_ALL
           redis-configure-opts: --enable-redis --enable-redis-igbinary --enable-redis-msgpack --enable-redis-lzf --with-liblzf --enable-redis-zstd --with-libzstd --enable-redis-lz4 --with-liblz4
