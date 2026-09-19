@@ -26,14 +26,15 @@ jobs:
     environment: icr-bench
     timeout-minutes: 90
 
-    # upstream tests.yml, job linux_tests, verbatim
+    # upstream tests.yml, job linux_tests; the images are upstream's tags pinned by digest (resolved 2026-09-19) so every leg
+    # of a campaign runs the same service binaries (Astra round 13, findings 2 and 11)
     services:
       memcached:
-        image: memcached:1.6-alpine
+        image: memcached:1.6-alpine@sha256:9e4de012dc607573052061c0bcb38abc775e1dd59b24e7ac38d1892842094aaf
         ports:
           - 11211:11211
       mysql:
-        image: mysql:9.7
+        image: mysql:9.7@sha256:29abb0a179982e4a8928138bfc7f918af9eda64e7eeb1b1d084c1720a20159e6
         env:
           MYSQL_ALLOW_EMPTY_PASSWORD: yes
           MYSQL_DATABASE: forge
@@ -41,12 +42,12 @@ jobs:
           - 3306
         options: --health-cmd="mysqladmin ping" --health-start-period=30s --health-interval=10s --health-timeout=5s --health-retries=3
       redis:
-        image: redis:7.0
+        image: redis:7.0@sha256:352c1fdadc91926edda08f45aeb3f27f37194c2f14101229c0523a11195c96e3
         ports:
           - 6379:6379
         options: --entrypoint redis-server
       dynamodb:
-        image: amazon/dynamodb-local:2.0.0
+        image: amazon/dynamodb-local:2.0.0@sha256:c8702bde709520b90930c20ee430d4123cd731da8e544cc4ccae0e2a78ee4fce
         ports:
           - 8888:8000
 
@@ -84,7 +85,7 @@ jobs:
       # upstream's command minus --fail-on-deprecation: a deprecation in a dependency released after the pinned commit
       # would abort the measurement; deprecations are still displayed
       - name: Execute tests
-        run: vendor/bin/phpunit --display-deprecation --no-coverage
+        run: vendor/bin/phpunit --display-deprecation --no-coverage --log-junit "$RUNNER_TEMP/junit.xml"
         env:
           DB_PORT: ${{ job.services.mysql.ports[3306] }}
           DB_USERNAME: root
@@ -92,3 +93,20 @@ jobs:
           DYNAMODB_ENDPOINT: "http://localhost:8888"
           AWS_ACCESS_KEY_ID: randomKey
           AWS_SECRET_ACCESS_KEY: randomSecret
+
+      # evidence per attempt: the executed and skipped tests by identity (JUnit), the resolved Composer dependencies, PHP
+      # and its extensions — so two legs are compared on what they ran, not on counts (round 13, finding 11)
+      - name: Evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          cp "$RUNNER_TEMP/junit.xml" "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          cp vendor/composer/installed.json "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+          { php --version; php -m; } > "$RUNNER_TEMP/evidence/php.txt" 2>&1 || true
+          docker images --digests --format '{{.Repository}}:{{.Tag}} {{.Digest}}' > "$RUNNER_TEMP/evidence/images.txt" 2>/dev/null || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: evidence-${{ matrix.leg }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence/
+          retention-days: 90

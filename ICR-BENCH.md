@@ -16,6 +16,9 @@ dependency released after the pinned commit cannot abort a measurement; and the 
 (`:imagick`) on every leg, because with it loaded the AVIF test errors on Ubuntu 26.04 (its ImageMagick has no AVIF
 encoder) while it passes or skips on GitHub's 24.04 — both sides now skip the same 32 imagick-guarded tests (570
 skipped instead of 539) and run the other 15 100.
+The service images are upstream's tags pinned by digest, and every job uploads its evidence (JUnit report, resolved
+Composer dependencies, PHP version and extensions, image digests) as a run artifact, so two legs are compared on what
+they actually ran.
 Note the operating systems differ: `ubuntu-latest` was Ubuntu 24.04 (kernel 6.17, Docker 28) at the time of the runs,
 ICR runs Ubuntu 26.04 (kernel 7.0, Docker 29); both are printed by the "Runner facts" step. It runs on `ubuntu-latest` (GitHub-hosted: on a
 public repository a 4 vCPU / 16 GB runner; a private repository gets 2 vCPU / 7 GB) and on ICR's `icr-2c`, `icr-4c` and
