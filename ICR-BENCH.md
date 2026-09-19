@@ -11,8 +11,12 @@ under `.github/upstream-workflows/` and do not run here. Nothing else was change
 **Method.** `.github/workflows/icr-bench.yml` is upstream's `linux_tests` job for one matrix cell (PHP 8.4, PHPUnit
 12.5.8, prefer-stable) with its service containers (MySQL 9.7, Redis 7, Memcached 1.6, DynamoDB Local): PHP and its
 extensions are installed by `shivammathur/setup-php` (the Redis extension is compiled), dependencies come from Composer
-without a cache, then PHPUnit runs the suite. The only edit is dropping `--fail-on-deprecation`, so a deprecation in a
-dependency released after the pinned commit cannot abort a measurement. It runs on `ubuntu-latest` (GitHub-hosted: on a
+without a cache, then PHPUnit runs the suite. Two edits: `--fail-on-deprecation` is dropped, so a deprecation in a
+dependency released after the pinned commit cannot abort a measurement; and the `imagick` extension is disabled
+(`:imagick`), because GitHub-hosted runners have none for PHP 8.4 while a self-hosted install brings it, and its AVIF
+test then needs an encoder Ubuntu 26.04's ImageMagick lacks — both legs now run the same tests with the same skips.
+Note the operating systems differ: `ubuntu-latest` was Ubuntu 24.04 (kernel 6.17, Docker 28) at the time of the runs,
+ICR runs Ubuntu 26.04 (kernel 7.0, Docker 29); both are printed by the "Runner facts" step. It runs on `ubuntu-latest` (GitHub-hosted: on a
 public repository a 4 vCPU / 16 GB runner; a private repository gets 2 vCPU / 7 GB) and on ICR's `icr-2c`, `icr-4c` and
 `icr-8c` (2 / 4 / 8 vCPU with 8 / 16 / 32 GiB, one fresh virtual machine per job, destroyed afterwards). Wall time and
 per-step time come from GitHub's own run data, so every published number links to its run. Several runs per leg; medians
